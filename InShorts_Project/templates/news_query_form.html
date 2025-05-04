@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>News API Tester</title>
+    <script>
+        // Function to get the user's current location
+        function getLocation() {
+            return new Promise((resolve, reject) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            resolve({
+                                lat: position.coords.latitude,
+                                lon: position.coords.longitude
+                            });
+                        },
+                        function(error) {
+                            reject("Error: Unable to retrieve your location.");
+                        }
+                    );
+                } else {
+                    reject("Geolocation is not supported by this browser.");
+                }
+            });
+        }
+
+        // Function to call the API with added latitude and longitude
+        function callAPI(endpoint) {
+            getLocation().then(location => {
+                const url = `${endpoint}?lat=${location.lat}&lon=${location.lon}`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+                    })
+                    .catch(error => {
+                        document.getElementById("output").innerText = "Error: " + error;
+                    });
+            }).catch(error => {
+                document.getElementById("output").innerText = error;
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>InShorts API Tester</h1>
+
+    <button onclick="callAPI('/get-news/')">Get News from Query</button>
+    <button onclick="callAPI('/get-news/category/')">Get News by Category</button>
+    <button onclick="callAPI('/get-news/score/')">Get News by Score</button>
+    <button onclick="callAPI('/get-news/source/')">Get News by Source</button>
+    <button onclick="callAPI('/get-news/nearby/')">Get News Nearby</button>
+    <button onclick="callAPI('/get-news/trending/')">Get Trending News</button>
+
+    <h2>Response:</h2>
+    <pre id="output" style="background-color: #f0f0f0; padding: 10px;"></pre>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>News Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            width: 100%;
+        }
+
+        .form-section {
+            max-width: 350px; /* Fix the width of the form section */
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            margin-right: 30px; /* Add space between input and cards */
+            flex-shrink: 0; /* Prevent the form from shrinking */
+        }
+
+        label, select, input {
+            display: block;
+            width: 100%;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        select, input {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            width: 100%;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #news-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* Create two columns */
+            gap: 20px; /* Space between the cards */
+            max-width: 800px;
+            flex-grow: 1;
+            overflow-y: auto; /* In case there are many articles, allow scrolling */
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-left: 5px solid #007BFF;
+            padding: 30px; /* Increase padding to make the card taller */
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column; /* Align content vertically */
+            height: auto; /* Allow the card to expand vertically */
+        }
+
+        .card:hover {
+            transform: scale(1.01);
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px; /* Increased space for vertical layout */
+            color: #333;
+        }
+
+        .card-source {
+            font-size: 14px;
+            color: #777;
+            margin-bottom: 10px;
+        }
+
+        .card-summary {
+            font-size: 16px;
+            color: #444;
+            margin-top: 10px; /* Add margin to the top of the summary */
+        }
+
+    </style>
+</head>
+<body>
+    <div>
+        <h2>News Retrieval System</h2>
+
+        <div class="form-section">
+            <label for="intent">Select News Intent</label>
+            <select id="intent">
+                <option value="category">Category</option>
+                <option value="score">Score</option>
+                <option value="search">Search</option>
+                <option value="source">Source</option>
+                <option value="nearby">Nearby</option>
+            </select>
+
+            <div id="input-fields"></div>
+
+            <button onclick="fetchNews()">Fetch News</button>
+        </div>
+    </div>
+
+    <div id="news-container"></div>
+
+    <script>
+        const inputFields = document.getElementById("input-fields");
+
+        // Adding an event listener to update inputs dynamically based on the selected intent
+        document.getElementById("intent").addEventListener("change", () => {
+            const intent = document.getElementById("intent").value;
+            let html = "";
+
+            switch (intent) {
+                case "category":
+                    html = `<input type="text" id="category" placeholder="e.g. Technology">`;
+                    break;
+                case "score":
+                    html = `<input type="number" step="0.01" id="min_score" placeholder="e.g. 0.7">`;
+                    break;
+                case "search":
+                    html = `<input type="text" id="query" placeholder="e.g. Elon Musk">`;
+                    break;
+                case "source":
+                    html = `<input type="text" id="source" placeholder="e.g. New York Times">`;
+                    break;
+                case "nearby":
+                    html = `
+                        <input type="number" id="lat" placeholder="Latitude">
+                        <input type="number" id="lon" placeholder="Longitude">
+                    `;
+                    break;
+            }
+
+            inputFields.innerHTML = html;
+        });
+
+        async function fetchNews() {
+            const intent = document.getElementById("intent").value;
+            let url = "/get-news/";
+
+            switch (intent) {
+                case "category":
+                    const category = document.getElementById("category").value;
+                    url += `category/?category=${encodeURIComponent(category)}`;
+                    break;
+                case "score":
+                    const minScore = document.getElementById("min_score").value;
+                    url += `score/?min_score=${minScore}`;
+                    break;
+                case "search":
+                    const query = document.getElementById("query").value;
+                    url += `search/?query=${encodeURIComponent(query)}`;
+                    break;
+                case "source":
+                    const source = document.getElementById("source").value;
+                    url += `source/?source=${encodeURIComponent(source)}`;
+                    break;
+                case "nearby":
+                    const lat = document.getElementById("lat").value;
+                    const lon = document.getElementById("lon").value;
+                    url += `nearby/?lat=${lat}&lon=${lon}`;
+                    break;
+            }
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                renderArticles(data.articles);
+            } catch (error) {
+                alert("Error fetching news: " + error);
+            }
+        }
+
+        // Render articles on the page
+        function renderArticles(articles) {
+          const container = document.getElementById("news-container");
+          container.innerHTML = "";
+
+          if (!articles.length) {
+              container.innerHTML = "<p>No articles found.</p>";
+              return;
+          }
+
+          articles.forEach(article => {
+              const card = document.createElement("div");
+              card.className = "card";
+              const rawDate = article.publication_date;
+
+              // Convert rawDate to a valid JavaScript Date object
+              const date = new Date(rawDate + "Z").toLocaleString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "2-digit",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+              });
+
+              card.innerHTML = `
+                  <div class="card-title">${article.title}</div>
+                  <div class="card-source"><strong>Source:</strong> ${article.source_name || "Unknown"} | <strong>Date:</strong> ${date}</div>
+                  <div class="card-summary">${article.llm_summary || article.description}</div>
+              `;
+
+              container.appendChild(card);
+          });
+        }
+
+        // Trigger default input display when the page loads
+        document.getElementById("intent").dispatchEvent(new Event("change"));
+    </script>
+</body>
+</html>

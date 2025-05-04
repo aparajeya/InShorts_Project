@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>News API Tester</title>
+    <script>
+        function callAPI(endpoint) {
+            fetch(endpoint)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+                })
+                .catch(error => {
+                    document.getElementById("output").innerText = "Error: " + error;
+                });
+        }
+    </script>
+</head>
+<body>
+    <h1>InShorts API Tester</h1>
+
+    <button onclick="callAPI('/get-news/')">Get News from Query</button>
+    <button onclick="callAPI('/get-news/category/')">Get News by Category</button>
+    <button onclick="callAPI('/get-news/score/')">Get News by Score</button>
+    <button onclick="callAPI('/get-news/source/')">Get News by Source</button>
+    <button onclick="callAPI('/get-news/nearby/')">Get News Nearby</button>
+    <button onclick="callAPI('/get-news/trending/')">Get Trending News</button>
+
+    <h2>Response:</h2>
+    <pre id="output" style="background-color: #f0f0f0; padding: 10px;"></pre>
+</body>
+</html>
