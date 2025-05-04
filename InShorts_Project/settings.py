@@ -103,8 +103,8 @@ DATABASES = {
 }
 
 
-#MONGO_URI = "mongodb://localhost:27017/"
-#MONGO_DB = "InshortsDB"
+MONGO_URI = "mongodb://localhost:27017/"
+MONGO_DB = "InshortsDB"
 
 
 # Password validation
