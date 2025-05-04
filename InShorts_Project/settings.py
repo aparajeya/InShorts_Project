@@ -70,7 +70,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "InShorts_Project.wsgi.application"
-ALLOWED_HOSTS = ['InShortsProject.onrender.com']
+ALLOWED_HOSTS = ['inshorts-project.onrender.com']
 
 
 # Database
