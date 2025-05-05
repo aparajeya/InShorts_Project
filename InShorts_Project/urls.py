@@ -32,7 +32,7 @@ from .views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("home", get_home_page, name="get_home_page"),
+    path("", get_home_page, name="get_home_page"),
     path("get-news/query", get_news_from_query, name="get_news_from_query"),
     path("get-news/category/", get_news_by_category, name="get_news_by_category"),
     path("get-news/score/", get_news_by_score, name="get_news_by_score"),
@@ -41,5 +41,5 @@ urlpatterns = [
     path("get-news/trending/", get_trending_news, name="get_trending_news"),
     path("get-news/search/", get_news_by_search, name="get_news_by_search"),
     path("news-query/", news_query_form, name="news_query_form"),
-    path("", news_query_form, name="home"),
+    path("news", news_query_form, name="home"),
 ]
