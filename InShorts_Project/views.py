@@ -91,11 +91,9 @@ def get_news_from_query(request):
 
 def get_news_by_category(request):
     category = request.GET.get("category", "")
-    category = "Technology"
     if not category:
         return JsonResponse({"error": "No category provided"}, status=400)
 
-    # Fetch articles by category using Django ORM
     articles = Article.objects.filter(category__icontains=category).order_by(
         "-publication_date"
     )[:5]
@@ -155,16 +153,15 @@ def get_news_by_source(request):
 
 def get_news_by_search(request):
     query = request.GET.get("query", "").strip()
-    # query = "delhi" #test
+    
     if not query:
         return JsonResponse({"error": "No search query provided"}, status=400)
 
-    # Fetch a set of articles that contain the query in title or description, ordered by relevance_score
     candidate_articles = Article.objects.filter(
         Q(title__icontains=query) | Q(description__icontains=query)
     ).order_by("-relevance_score")[
         :50
-    ]  # Fetch the top 50 articles
+    ]  
     articles_data = [model_to_dict(article) for article in candidate_articles]
     ranked_articles = []
 
@@ -172,18 +169,18 @@ def get_news_by_search(request):
     for article in articles_data:
         title_score = text_match_score(article["title"], query)
         desc_score = text_match_score(article["description"], query)
-        match_score = title_score * 2 + desc_score  # Title match gets higher weight
+        match_score = title_score * 2 + desc_score
         combined_score = (
             0.5 * article["relevance_score"] + 0.5 * match_score
         )  # Adjust weight as needed
         article["combined_score"] = combined_score
 
         ranked_articles.append(article)
-    # Sort articles by combined score (highest score first)
+    
     ranked_articles.sort(key=lambda x: x["combined_score"], reverse=True)
     ranked_articles = ranked_articles[:5]
 
-    # Extract the top 5 ranked articles
+    # Get the top 5 ranked articles
 
     for articles in ranked_articles:
         llm_summary = generate_llm_summary(

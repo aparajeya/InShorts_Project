@@ -13,6 +13,7 @@ client = MongoClient(settings.MONGO_URI)
 db = client[settings.MONGO_DB]
 articles_collection = db["articles"]
 
+#TODO move this to .env file
 GROQ_API_KEY = "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"
 url = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -20,8 +21,6 @@ headers = {
     "Authorization": f"Bearer {GROQ_API_KEY}",
     "Content-Type": "application/json",
 }
-
-# and do not create nested JSON
 
 
 def call_groq_api(input_query):
@@ -141,7 +140,6 @@ def generate_llm_summary(title, description, article_url):
         ],
         "temperature": 0.4,
     }
-    # "content": f"Title: {title}\nDescription: {description}\nURL: {article_url}",
 
     response = requests.post(url, headers=headers, json=data)
 
