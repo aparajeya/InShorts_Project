@@ -70,7 +70,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "InShorts_Project.wsgi.application"
-ALLOWED_HOSTS = ['inshorts-project.onrender.com',  '127.0.0.1']
+ALLOWED_HOSTS = ["inshorts-project.onrender.com", "127.0.0.1"]
 
 
 # Database
@@ -90,17 +90,17 @@ DATABASES = {
 # TODO MOVE THESE VALUES AND API KEYS TO .env FILE
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'InshortsDB',  
-        'ENFORCE_SCHEMA': False,
-        'CLIENT': {
-            'name': 'InshortsDB',
-            'host': 'mongodb+srv://lonefighter4747:akash123@inshortsdb.ggcua65.mongodb.net/InshortsDB?retryWrites=true&w=majority',  # MongoDB URI
-            'username': 'lonefighter4747', 
-            'password': 'akash123',  
-            'authMechanism': 'SCRAM-SHA-1'
-        }
+    "default": {
+        "ENGINE": "djongo",
+        "NAME": "InshortsDB",
+        "ENFORCE_SCHEMA": False,
+        "CLIENT": {
+            "name": "InshortsDB",
+            "host": "mongodb+srv://lonefighter4747:akash123@inshortsdb.ggcua65.mongodb.net/InshortsDB?retryWrites=true&w=majority",  # MongoDB URI
+            "username": "lonefighter4747",
+            "password": "akash123",
+            "authMechanism": "SCRAM-SHA-1",
+        },
     }
 }
 

@@ -61,12 +61,57 @@ def call_groq_api(input_query):
         try:
             # Extract JSON from the reply
             json_str = re.search(r"\{.*\}", reply, re.DOTALL).group(0)
+
+            """
+            Response Structure = {'entities': [{'type': 'person', 'name': 'Indian PM'}, {'type': 'location', 'name': 'US'}], 'intent': ['nearby', 'source'], 'concepts': ['politics']}
+            """
             return json.loads(json_str)
         except Exception as e:
-            print("Failed to parse JSON:\n", reply)
             raise e
-        # print("REPLY IS ",reply)
-        # return (reply)  # Parsing the response string to dict
+    else:
+        return None
+
+
+def parse_news_query(input_query):
+    system_prompt = """
+    You are a news query processor. Your task is to convert user queries into structured data used by a news retrieval system.
+
+    For each query, populate the following fields:
+    1. "category": Return relevant categories like politics, sports, technology, business, etc. You can return multiple.
+    2. "score": Leave this blank always.
+    3. "search": Extract **one essential keyword** from the query that best represents the search intent.
+    4. "source": Extract only if the user mentions a specific source (e.g., BBC, CNN). Else, return empty.
+    5. "nearby": Extract the location if user is asking for news from or near a place (e.g., in Delhi, near Mumbai).
+
+    Only return the result in this exact JSON format:
+    {
+      "category": [...],
+      "score": "",
+      "search": "...",
+      "source": "...",
+      "nearby": "..."
+    }
+    Do NOT include any explanations or text outside the JSON.
+    """
+
+    data = {
+        "model": "llama3-8b-8192",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": input_query},
+        ],
+        "temperature": 0.3,
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        reply = response.json()["choices"][0]["message"]["content"]
+        try:
+            json_str = re.search(r"\{.*\}", reply, re.DOTALL).group(0)
+            return json.loads(json_str)
+        except Exception as e:
+            raise e
     else:
         return None
 
@@ -131,29 +176,6 @@ def text_match_score(text, query):
     return score
 
 
-# Helper functions for entity classification
-def is_location(entity):
-    """Simple check if entity might be a location"""
-    # In a real implementation, use geocoding service or location database
-    common_location_words = ['city', 'town', 'state', 'country', 'street']
-    return any(word in entity for word in common_location_words)
-
-def is_category(entity):
-    """Check if entity might be a news category"""
-    common_categories = [
-        'technology', 'business', 'sports', 'entertainment', 
-        'health', 'science', 'politics'
-    ]
-    return entity.lower() in common_categories
-
-def is_news_source(entity):
-    """Check if entity might be a news source"""
-    common_sources = [
-        'new york times', 'cnn', 'bbc', 'reuters', 
-        'the guardian', 'wall street journal'
-    ]
-    return entity.lower() in common_sources
-
 def geocode_address(address):
     """
     Converts a human-readable address to (latitude, longitude).
@@ -169,5 +191,38 @@ def geocode_address(address):
             return None
 
     except (GeocoderTimedOut, GeocoderServiceError) as e:
-        print(f"Geocoding error: {e}")
         return None
+
+
+def select_top_articles(article_lists, max_articles=5):
+    """
+    Selects up to `max_articles` from the given list of article lists.
+    It picks one article from each list in round-robin fashion.
+
+    Args:
+        article_lists (List[List[dict]]): A list containing multiple article lists.
+        max_articles (int): Maximum number of articles to return.
+
+    Returns:
+        List[dict]: Combined list of up to `max_articles` articles.
+    """
+    final_articles = []
+    index = 0
+
+    while len(final_articles) < max_articles:
+        added_any = False
+
+        for articles in article_lists:
+            if index < len(articles):
+                final_articles.append(articles[index])
+                added_any = True
+
+            if len(final_articles) == max_articles:
+                break
+
+        if not added_any:
+            break
+
+        index += 1
+
+    return final_articles

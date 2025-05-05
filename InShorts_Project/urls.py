@@ -26,14 +26,14 @@ from .views import (
     get_trending_news,
     news_query_form,
     get_news_by_search,
-    get_home_page
+    get_home_page,
 )
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", get_home_page, name="get_home_page"),
-    path("get-news/query", get_news_from_query, name="get_news_from_query"),
+    path("get-news/query/", get_news_from_query, name="get_news_from_query"),
     path("get-news/category/", get_news_by_category, name="get_news_by_category"),
     path("get-news/score/", get_news_by_score, name="get_news_by_score"),
     path("get-news/source/", get_news_by_source, name="get_news_by_source"),

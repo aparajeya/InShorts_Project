@@ -1,17 +1,18 @@
 from django.http import JsonResponse
 from .helpers import (
     call_groq_api,
+    parse_news_query,
     calculate_distance,
     generate_llm_summary,
     text_match_score,
-    is_category,
-    is_location,
-    is_news_source
+    geocode_address,
+    select_top_articles,
 )
 from InShorts_Project.models import Article
 from django.shortcuts import render
 from django.forms.models import model_to_dict
 from django.db.models import Q
+import json
 
 import logging
 
@@ -21,202 +22,70 @@ logger = logging.getLogger("InshortsProject")
 def news_query_form(request):
     return render(request, "news_query_form.html")
 
+
 def get_home_page(request):
     return render(request, "index.html")
 
 
 def get_news_from_query(request):
     input_query = request.GET.get("query", "")
-    #input_query = "Tell me latest development of ISRO and its chairman"
-    print("FANGGGGGGGGGGGGG")
 
     if not input_query:
         return JsonResponse({"error": "No query provided"}, status=400)
 
     # Call Groq API to get structured information
-    structured_data = call_groq_api(input_query)
-    #structured_data = {"k": "b"}
+    structured_data = parse_news_query(input_query)
 
     if structured_data:
-        entities = structured_data.get("entities", [])
-        intent = structured_data.get("intent", [])
-        concepts = structured_data.get("concepts", [])
+        category = structured_data.get("category")
+        score = structured_data.get("score")
+        search = structured_data.get("search")
+        source = structured_data.get("source")
+        nearby = structured_data.get("nearby")
+        all_articles = []
 
-        # HARD CODING FOR TESTING
-        #entities = ["ISRO","K Sivan"]
-        #intent = ["source"]
-        #concepts = ["space"] 
+        if category:
+            category_response = get_news_by_category(request)
+            category_articles = json.loads(category_response.content).get(
+                "articles", []
+            )
+            all_articles.append(category_articles)
 
-        # Fetch articles based on the intent extracted
-        articles = fetch_articles_based_on_intent(request ,intent, entities, concepts)
+        if source:
+            source_response = get_news_by_source(request)
+            source_articles = json.loads(source_response.content).get("articles", [])
+            all_articles.append(source_articles)
 
-        print(
-            f"The llm generated data is {entities} and intent is {intent} and concept is {concepts}"
-        )
+        if search:
+            request.GET._mutable = True
+            request.GET["query"] = search
+            search_response = get_news_by_search(request)
+            search_articles = json.loads(search_response.content).get("articles", [])
+            all_articles.append(search_articles)
+
+        if nearby:
+            coords = geocode_address(nearby)
+            if coords:
+                lat, lon = coords
+                request.GET["lat"] = lat
+                request.GET["lon"] = lon
+                nearby_response = get_news_nearby(request)
+                nearby_articles = json.loads(nearby_response.content).get(
+                    "articles", []
+                )
+                all_articles.append(nearby_articles)
+
+        if score:
+            score_response = get_news_by_score(request)
+            score_articles = json.loads(score_response.content).get("articles", [])
+            all_articles.append(score_articles)
+
+        articles = select_top_articles(all_articles, 5)
         return JsonResponse({"articles": articles}, safe=False)
+
     else:
         return JsonResponse(
             {"error": "Error processing query with Groq API"}, status=500
-        )
-
-'''
-def fetch_articles_based_on_intent(intent, entities, concepts):
-    print("cooollllllllllllllllllll")
-    articles = []
-
-    # Example logic to fetch articles based on different intents
-    if "nearby" in intent:
-        # Handle geospatial query based on location (e.g., latitude, longitude)
-        lat = entities[0].get("latitude", 0)
-        lon = entities[0].get("longitude", 0)
-        articles = Article.objects.filter(
-            latitude__gte=lat - 0.1,
-            latitude__lte=lat + 0.1,
-            longitude__gte=lon - 0.1,
-            longitude__lte=lon + 0.1,
-        ).order_by("relevance_score")[:5]
-    elif "source" in intent:
-        articles = Article.objects.filter(
-            source_name__in=[entity["value"] for entity in entities]
-        ).order_by("-relevance_score")[:5]
-    elif "category" in intent:
-        articles = Article.objects.filter(category__contains=concepts).order_by(
-            "-relevance_score"
-        )[:5]
-
-    # Enrich with LLM summaries
-    for article in articles:
-        article.llm_summary = generate_llm_summary(article.title, article.description)
-
-    return list(articles)
-'''
-'''
-
-def fetch_articles_based_on_intent(request,intent, entities, concepts):
-    print("Intent-based fetch triggered")
-    lat = float(request.GET.get("lat", 0))
-    lon = float(request.GET.get("lon", 0))
-    articles = []
-    try:
-      if "nearby" in intent:
-          print("KKKK")
-          articles = Article.objects.filter(
-              latitude__gte=lat - 0.1,
-              latitude__lte=lat + 0.1,
-              longitude__gte=lon - 0.1,
-              longitude__lte=lon + 0.1,
-          )
-          articles = sorted(
-              articles, key=lambda x: calculate_distance(lat, lon, x.latitude, x.longitude)
-          )[:5]
-
-      elif "source" in intent:
-          print("LLLL")
-          source_names = [entity["value"] for entity in entities if "value" in entity]
-          articles = Article.objects.filter(
-              source_name__in=source_names
-          ).order_by("-publication_date")[:5]
-
-      elif "category" in intent:
-          print("MMMM")
-          if isinstance(concepts, list):
-              articles = Article.objects.filter(
-                  Q(category__icontains=concepts[0])  # optionally extend to include OR of all concepts
-              ).order_by("-publication_date")[:5]
-          else:
-              articles = Article.objects.filter(
-                  category__icontains=concepts
-              ).order_by("-publication_date")[:5]
-
-      # Convert to dicts and enrich with LLM summaries
-      print("NNNN")
-      articles_data = [model_to_dict(article) for article in articles]
-
-      for idx, article_dict in enumerate(articles_data):
-          article_dict.pop("id", None)
-          print("OOOO")
-          if idx == 0:
-              article_dict["llm_summary"] = generate_llm_summary(
-                  article_dict["title"], article_dict["description"], article_dict["url"]
-              )
-          else:
-              article_dict["llm_summary"] = "PLACEHOLDER SUMMARY"
-      print("PPPP")
-      return articles_data
-    except Exception as e:
-        print("BUG IS ",e)
-'''
-
-def fetch_articles_based_on_intent(request, intent, entities, concepts):
-    """
-    Route the request to appropriate news fetching function based on intent and entities
-    
-    Args:
-        request: Django request object
-        intent: List of detected intents (e.g., ['category', 'source'])
-        entities: List of extracted entities (e.g., ['New York Times', 'Technology'])
-        concepts: List of extracted concepts (not currently used but available for future enhancements)
-    
-    Returns:
-        JsonResponse with articles matching the intent and entities
-    """
-    # Convert to lowercase for case-insensitive matching
-    intent = [i.lower() for i in intent]
-    entities = [e.lower() for e in entities]
-    
-    # Determine primary intent (first in list or most specific)
-    primary_intent = intent[0] if intent else 'trending'
-    
-    try:
-        if 'nearby' in intent:
-            # Look for location entities
-            location_entity = next((e for e in entities if is_location(e)), None)
-            if location_entity:
-                # In a real implementation, you'd geocode the location to get lat/lon
-                # For demo purposes, we'll use default coordinates
-                request.GET = request.GET.copy()
-                request.GET.update({'lat': 0, 'lon': 0})  # Replace with actual geocoding
-                return get_news_nearby(request)
-        
-        if 'category' in intent:
-            # Look for category in entities (e.g., "technology news")
-            category_entity = next((e for e in entities if is_category(e)), None)
-            if category_entity:
-                request.GET = request.GET.copy()
-                request.GET.update({'category': category_entity})
-                return get_news_by_category(request)
-        
-        if 'source' in intent:
-            # Look for news sources in entities
-            source_entity = next((e for e in entities if is_news_source(e)), None)
-            if source_entity:
-                request.GET = request.GET.copy()
-                request.GET.update({'source': source_entity})
-                return get_news_by_source(request)
-        
-        if 'search' in intent or 'query' in intent:
-            # Use all entities as search terms
-            search_terms = " ".join(entities)
-            if search_terms:
-                request.GET = request.GET.copy()
-                request.GET.update({'query': search_terms})
-                return get_news_by_search(request)
-        
-        if 'trending' in intent:
-            return get_trending_news(request)
-        
-        if 'score' in intent or 'relevance' in intent:
-            request.GET = request.GET.copy()
-            request.GET.update({'min_score': 0.7})  # Default threshold
-            return get_news_by_score(request)
-        
-        # Default fallback to trending news
-        return get_trending_news(request)
-    
-    except Exception as e:
-        return JsonResponse(
-            {"error": f"Failed to fetch articles: {str(e)}"}, 
-            status=500
         )
 
 
@@ -230,18 +99,13 @@ def get_news_by_category(request):
     articles = Article.objects.filter(category__icontains=category).order_by(
         "-publication_date"
     )[:5]
-    print(1)
+
     articles_data = [model_to_dict(article) for article in articles]
-    print(2)
-    count = 0
+
     for articles in articles_data:
-        if count <= 5:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles["llm_summary"] = llm_summary
 
@@ -256,16 +120,11 @@ def get_news_by_score(request):
     )[:5]
 
     articles_data = [model_to_dict(article) for article in articles]
-    print(3333)
-    count = 0
+
     for articles in articles_data:
-        if count == 0:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles["llm_summary"] = llm_summary
 
@@ -283,16 +142,11 @@ def get_news_by_source(request):
     ]
 
     articles_data = [model_to_dict(article) for article in articles]
-    print(44444444)
-    count = 0
+
     for articles in articles_data:
-        if count == 0:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles["llm_summary"] = llm_summary
 
@@ -311,13 +165,11 @@ def get_news_by_search(request):
     ).order_by("-relevance_score")[
         :50
     ]  # Fetch the top 50 articles
-    print(2324343434)
     articles_data = [model_to_dict(article) for article in candidate_articles]
     ranked_articles = []
 
     # Calculate combined score (relevance_score + text match score)
     for article in articles_data:
-        print(99)
         title_score = text_match_score(article["title"], query)
         desc_score = text_match_score(article["description"], query)
         match_score = title_score * 2 + desc_score  # Title match gets higher weight
@@ -332,15 +184,11 @@ def get_news_by_search(request):
     ranked_articles = ranked_articles[:5]
 
     # Extract the top 5 ranked articles
-    count = 0
+
     for articles in ranked_articles:
-        if count == 0:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles.pop("combined_score")
         articles["llm_summary"] = llm_summary
@@ -351,7 +199,6 @@ def get_news_by_search(request):
 def get_news_nearby(request):
     lat = float(request.GET.get("lat", 0))
     lon = float(request.GET.get("lon", 0))
-    print(f"lat {lat} and lon are {lon}")
 
     articles = Article.objects.filter(
         latitude__gte=lat - 1.0,
@@ -365,16 +212,11 @@ def get_news_nearby(request):
     )[:5]
 
     articles_data = [model_to_dict(article) for article in articles]
-    print(2)
-    count = 0
+
     for articles in articles_data:
-        if count == 0:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles["llm_summary"] = llm_summary
 
@@ -390,16 +232,11 @@ def get_trending_news(request):
     trending_articles = Article.objects.all().order_by("-relevance_score")[:limit]
 
     articles_data = [model_to_dict(article) for article in trending_articles]
-    print(2)
-    count = 0
+
     for articles in articles_data:
-        if count == 0:
-            llm_summary = generate_llm_summary(
-                articles["title"], articles["description"], articles["url"]
-            )
-        else:
-            llm_summary = "PLACEHOLDER SUMMARY"
-        count += 1
+        llm_summary = generate_llm_summary(
+            articles["title"], articles["description"], articles["url"]
+        )
         articles.pop("id")
         articles["llm_summary"] = llm_summary
 

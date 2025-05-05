@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>News Dashboard</title>
+    <link rel="icon" href="https://img.icons8.com/ios-filled/50/news.png" type="image/png">
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -115,6 +116,7 @@
         <div class="form-section">
             <label for="intent">Select News Intent</label>
             <select id="intent">
+                <option value="custom">Custom Query</option>
                 <option value="category">Category</option>
                 <option value="score">Score</option>
                 <option value="search">Search</option>
@@ -139,6 +141,9 @@
             let html = "";
 
             switch (intent) {
+                case "custom":
+                    html = `<input type="text" id="custom_query" placeholder="e.g. Tell me about ISRO's latest missions">`;
+                    break;
                 case "category":
                     html = `<input type="text" id="category" placeholder="e.g. Technology">`;
                     break;
@@ -149,7 +154,7 @@
                     html = `<input type="text" id="query" placeholder="e.g. Elon Musk">`;
                     break;
                 case "source":
-                    html = `<input type="text" id="source" placeholder="e.g. New York Times">`;
+                    html = `<input type="text" id="source" placeholder="e.g. Reuters">`;
                     break;
                 case "nearby":
                     html = `
@@ -167,6 +172,10 @@
             let url = "/get-news/";
 
             switch (intent) {
+                case "custom":
+                    const customQuery = document.getElementById("custom_query").value;
+                    url += `query/?query=${encodeURIComponent(customQuery)}`;
+                    break;
                 case "category":
                     const category = document.getElementById("category").value;
                     url += `category/?category=${encodeURIComponent(category)}`;
